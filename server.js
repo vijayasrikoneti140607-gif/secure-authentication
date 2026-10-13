@@ -18,6 +18,7 @@ throw new Error("JWT_SECRET must be set to a secret of at least 32 characters.")
 
 app.use(helmet());
 app.use(express.json({ limit: "10kb" }));
+app.use(express.static("public"));
 
 app.use("/api/auth", rateLimit({
 windowMs: 15 * 60 * 1000,
