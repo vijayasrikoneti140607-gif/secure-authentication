@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Secure user authentication demo with registration, login and protected routes.">
+  <title>Secure Authentication</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+```
+body {
+  margin: 0;
+  min-height: 100vh;
+  padding: 30px 16px;
+  font-family: Arial, sans-serif;
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+main {
+  max-width: 480px;
+  margin: 30px auto;
+}
+
+h1 {
+  text-align: center;
+  color: #1d4ed8;
+}
+
+.subtitle {
+  text-align: center;
+  color: #64748b;
+  margin-bottom: 28px;
+}
+
+.card {
+  background: white;
+  padding: 24px;
+  margin-bottom: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(15, 23, 42, 0.08);
+}
+
+h2 {
+  margin-top: 0;
+  font-size: 20px;
+}
+
+label {
+  display: block;
+  font-weight: bold;
+  margin: 14px 0 6px;
+}
+
+input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  font-size: 16px;
+}
+
+button {
+  width: 100%;
+  margin-top: 16px;
+  padding: 12px;
+  border: none;
+  border-radius: 7px;
+  background: #2563eb;
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #1d4ed8;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.secondary {
+  background: #475569;
+}
+
+.secondary:hover {
+  background: #334155;
+}
+
+#message {
+  padding: 12px;
+  border-radius: 7px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.note {
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.5;
+}
+```
+
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Secure Authentication</h1>
+    <p class="subtitle">Register, sign in, and access your protected profile.</p>
+
+```
+<section class="card">
+  <h2>Create an account</h2>
+  <form id="registerForm">
+    <label for="registerUsername">Username</label>
+    <input id="registerUsername" name="username"
+      minlength="3" maxlength="30"
+      pattern="[A-Za-z0-9_]{3,30}"
+      autocomplete="username" required>
+
+    <label for="registerPassword">Password</label>
+    <input id="registerPassword" name="password"
+      type="password" minlength="12" maxlength="72"
+      autocomplete="new-password" required>
+
+    <p class="note">Use at least 12 characters for your password.</p>
+    <button type="submit">Register</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Log in</h2>
+  <form id="loginForm">
+    <label for="loginUsername">Username</label>
+    <input id="loginUsername" name="username"
+      maxlength="30" autocomplete="username" required>
+
+    <label for="loginPassword">Password</label>
+    <input id="loginPassword" name="password"
+      type="password" maxlength="72"
+      autocomplete="current-password" required>
+
+    <button type="submit">Log In</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Protected profile</h2>
+  <p class="note">After logging in, retrieve your account information using your authentication token.</p>
+  <button id="profileButton" type="button">View My Profile</button>
+  <button id="logoutButton" class="secondary" type="button">Log Out</button>
+</section>
+
+<section class="card" aria-live="polite">
+  <h2>Status</h2>
+  <p id="message">Welcome! Register a new account or log in.</p>
+  <pre id="profile" hidden></pre>
+</section>
+```
+
+  </main>
+
+  <script>
+    const message = document.getElementById("message");
+    const profile = document.getElementById("profile");
+    let token = null;
+
+    function showMessage(text) {
+      message.textContent = text;
+      profile.hidden = true;
+      profile.textContent = "";
+    }
+
+    async function request(path, options = {}) {
+      const response = await fetch(path, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(options.headers || {})
+        }
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.error || `Request failed (${response.status})`);
+      }
+
+      return data;
+    }
+
+    async function submitForm(event, endpoint, isLogin) {
+      event.preventDefault();
+
+      const form = event.currentTarget;
+      const button = form.querySelector('button[type="submit"]');
+      button.disabled = true;
+
+      try {
+        const values = Object.fromEntries(new FormData(form).entries());
+        const data = await request(`/api/auth/${endpoint}`, {
+          method: "POST",
+          body: JSON.stringify(values)
+        });
+
+        if (isLogin) {
+          token = data.token;
+          showMessage("Login successful! You can now view your protected profile.");
+        } else {
+          showMessage("Registration successful! You can now log in.");
+          form.reset();
+        }
+      } catch (error) {
+        showMessage(error.message);
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    document.getElementById("registerForm").addEventListener("submit", event => {
+      submitForm(event, "register", false);
+    });
+
+    document.getElementById("loginForm").addEventListener("submit", event => {
+      submitForm(event, "login", true);
+    });
+
+    document.getElementById("profileButton").addEventListener("click", async () => {
+      if (!token) {
+        showMessage("Please log in first to access your protected profile.");
+        return;
+      }
+
+      try {
+        const data = await request("/api/auth/me");
+        message.textContent = "Authenticated successfully!";
+        profile.textContent = JSON.stringify(data, null, 2);
+        profile.hidden = false;
+      } catch (error) {
+        token = null;
+        showMessage(error.message);
+      }
+    });
+
+    document.getElementById("logoutButton").addEventListener("click", () => {
+      token = null;
+      showMessage("You have been logged out.");
+    });
+  </script>
+
+</body>
+</html>
